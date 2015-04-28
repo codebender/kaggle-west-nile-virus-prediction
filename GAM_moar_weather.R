@@ -36,6 +36,7 @@ weather$Tavg <- as.numeric(weather$Tavg)
 weather$Tmax <- as.numeric(weather$Tmax)
 weather$Tmin <- as.numeric(weather$Tmin)
 weather$PrecipTotal <- as.numeric(weather$PrecipTotal)
+weather$AvgSpeed <- as.numeric(weather$AvgSpeed)
 weather$Tavg[is.na(weather$Tavg)] <- (weather$Tmax[is.na(weather$Tavg)] + weather$Tmin[is.na(weather$Tavg)])/2
 weather$PrecipTotal[is.na(weather$PrecipTotal)] <- 0.0
 
@@ -43,6 +44,7 @@ week_average_temps <- aggregate(Tavg ~ week + year, data=weather, mean)
 week_average_temps <- merge(week_average_temps, aggregate(Tmax ~ week + year, data=weather, mean), by=c("week","year"))
 week_average_temps <- merge(week_average_temps, aggregate(Tmin ~ week + year, data=weather, mean), by=c("week","year"))
 week_average_temps <- merge(week_average_temps, aggregate(PrecipTotal ~ week + year, data=weather, sum), by=c("week","year"))
+week_average_temps <- merge(week_average_temps, aggregate(AvgSpeed ~ week + year, data=weather, mean), by=c("week","year"))
 week_average_temps <- week_average_temps[with(week_average_temps, order(year, week)), ]
 
 train_with_weather <- merge(train, week_average_temps, by=c("week","year"))
@@ -53,10 +55,12 @@ test_with_weather <- merge(test, week_average_temps, by=c("week","year"))
 # previous_week_temps <- aggregate(Tavg ~ week + year, data=weather, mean)
 # previous_week_temps <- merge(previous_week_temps, aggregate(Tmax ~ week + year, data=weather, mean), by=c("week","year"))
 # previous_week_temps <- merge(previous_week_temps, aggregate(Tmin ~ week + year, data=weather, mean), by=c("week","year"))
+# previous_week_temps <- merge(previous_week_temps, aggregate(PrecipTotal ~ week + year, data=weather, sum), by=c("week","year"))
 # previous_week_temps$next_week_num <- factor(as.numeric(as.character(previous_week_temps$week)) + 1)
-# names(previous_week_temps)[2] <- "previousTavg"
-# names(previous_week_temps)[3] <- "previousTmax"
-# names(previous_week_temps)[4] <- "previousTmin"
+# names(previous_week_temps)[3] <- "pwTavg"
+# names(previous_week_temps)[4] <- "pwTmax"
+# names(previous_week_temps)[5] <- "pwTmin"
+# names(previous_week_temps)[6] <- "pwPrecipTotal"
 #
 # previous_week_temps <- previous_week_temps[with(previous_week_temps, order(year, week)), ]
 # previous_week_temps$week <- NULL
@@ -65,14 +69,14 @@ test_with_weather <- merge(test, week_average_temps, by=c("week","year"))
 # test_with_weather <- merge(data.frame(test_with_weather), previous_week_temps, by.x=c("week","year"), by.y=c("next_week_num","year"))
 
 # we'll set aside 2011 data as test, and train on the remaining
-my.train = data.frame(data.frame(train_with_weather)[,c("WnvPresent", "week", "Tavg", "Tmax", "Tmin", "PrecipTotal", "Block", "Species2", "Latitude", "Longitude")])
+my.train = data.frame(data.frame(train_with_weather)[,c("WnvPresent", "week", "Tavg", "Tmax", "Tmin", "PrecipTotal", "AvgSpeed", "Block", "Species2", "Latitude", "Longitude")])
 train1<-my.train[train_with_weather$year != 2011,]
 train2<-my.train[train_with_weather$year == 2011,]
 train2$Block[train2$Block==29] <- 28
 train2$Block[train2$Block==34] <- 33
 
 ## GAM modelling
-fitCv = gam(WnvPresent ~ week + Block + Tavg + Tmax + Tmin + PrecipTotal + Species2 + lo(Latitude, Longitude),
+fitCv = gam(WnvPresent ~ week + Block + Tavg + Tmax + Tmin + PrecipTotal + AvgSpeed + Species2 + lo(Latitude, Longitude),
            data = train1, family="binomial")
 p2<-predict(fitCv, newdata = train2, type = "response")
 ## check for a reasonable AUC of the model against unseen data (2011)
@@ -88,4 +92,4 @@ summary(pSubmit)
 submissionFile <- cbind(test_with_weather$Id,pSubmit)
 colnames(submissionFile) <- c("Id","WnvPresent")
 options("scipen"=100, "digits"=8)
-write.csv(submissionFile,"Output/GAM_moar_weather.csv",row.names=FALSE,quote=FALSE)
+write.csv(submissionFile,"Output/GAM_moar_weather_2.csv",row.names=FALSE,quote=FALSE)

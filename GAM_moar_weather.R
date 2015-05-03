@@ -21,8 +21,10 @@ test[,Species2:=factor(vSpecies[(nrow(train)+1):length(vSpecies)],levels=unique(
 ## date fields
 train$week <- factor(format(as.POSIXct(train$Date, format="%Y-%m-%d"), format="%U"))
 test$week <- factor(format(as.POSIXct(test$Date, format="%Y-%m-%d"), format="%U"))
-train$year <- format(as.POSIXct(train$Date, format="%Y-%m-%d"), format="%Y")
-test$year <- format(as.POSIXct(test$Date, format="%Y-%m-%d"), format="%Y")
+train$year <- as.numeric(format(as.POSIXct(train$Date, format="%Y-%m-%d"), format="%Y"))
+test$year <- as.numeric(format(as.POSIXct(test$Date, format="%Y-%m-%d"), format="%Y"))
+train$month <- factor(format(as.POSIXct(train$Date, format="%Y-%m-%d"), format="%B"))
+test$month <- factor(format(as.POSIXct(test$Date, format="%Y-%m-%d"), format="%B"))
 
 ## fix Blocks data
 train$Block <- as.factor(train$Block)
@@ -31,7 +33,7 @@ test$Block[test$Block == 26] <- 25
 
 ## average temps by week(avg, high, low)
 weather$week <- factor(format(as.POSIXct(weather$Date, format="%Y-%m-%d"), format="%U"))
-weather$year <- factor(format(as.POSIXct(weather$Date, format="%Y-%m-%d"), format="%Y"))
+weather$year <- as.numeric(format(as.POSIXct(weather$Date, format="%Y-%m-%d"), format="%Y"))
 weather$Tavg <- as.numeric(weather$Tavg)
 weather$Tmax <- as.numeric(weather$Tmax)
 weather$Tmin <- as.numeric(weather$Tmin)
@@ -69,15 +71,15 @@ test_with_weather <- merge(test, week_average_temps, by=c("week","year"))
 # test_with_weather <- merge(data.frame(test_with_weather), previous_week_temps, by.x=c("week","year"), by.y=c("next_week_num","year"))
 
 # we'll set aside 2011 data as test, and train on the remaining
-my.train = data.frame(data.frame(train_with_weather)[,c("WnvPresent", "week", "Tavg", "Tmax", "Tmin", "PrecipTotal", "AvgSpeed", "Block", "Species2", "Latitude", "Longitude")])
+my.train = data.frame(data.frame(train_with_weather)[,c("WnvPresent", "year", "month", "week", "Tavg", "Tmax", "Tmin", "PrecipTotal", "AvgSpeed", "Block", "Species2", "Latitude", "Longitude")])
 train1<-my.train[train_with_weather$year != 2011,]
 train2<-my.train[train_with_weather$year == 2011,]
 train2$Block[train2$Block==29] <- 28
 train2$Block[train2$Block==34] <- 33
 
 ## GAM modelling
-fitCv = gam(WnvPresent ~ week + Block + Tavg + Tmax + Tmin + PrecipTotal + AvgSpeed + Species2 + lo(Latitude, Longitude),
-           data = train1, family="binomial")
+fitCv = gam(WnvPresent ~ year + week + Block + Tavg + Tmax + Tmin + PrecipTotal + AvgSpeed + Species2 + Latitude + Longitude,
+           data = train1, family="binomial", control = gam.control(nthreads=4, trace=TRUE), select=TRUE)
 p2<-predict(fitCv, newdata = train2, type = "response")
 ## check for a reasonable AUC of the model against unseen data (2011)
 auc(train2$WnvPresent,p2)
@@ -92,4 +94,4 @@ summary(pSubmit)
 submissionFile <- cbind(test_with_weather$Id,pSubmit)
 colnames(submissionFile) <- c("Id","WnvPresent")
 options("scipen"=100, "digits"=8)
-write.csv(submissionFile,"Output/GAM_moar_weather_2.csv",row.names=FALSE,quote=FALSE)
+write.csv(submissionFile,"Output/GAM_moar_weather_with_year.csv",row.names=FALSE,quote=FALSE)
